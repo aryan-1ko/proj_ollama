@@ -1,0 +1,21 @@
+{
+  "name": "ollama-code-reviewer",
+  "version": "1.0.0",
+  "description": "CLI-based code review tool powered by Ollama",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node index.js"
+  },
+  "keywords": [
+    "ollama",
+    "code-review",
+    "cli",
+    "ai"
+  ],
+  "author": "aryan-1ko",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
