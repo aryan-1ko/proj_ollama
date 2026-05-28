@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Reviewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        header {
+            background: #2c3e50;
+            color: white;
+            padding: 1rem;
+            text-align: center;
+        }
+        h1 {
+            font-size: 1.5rem;
+        }
+        .container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        .left-panel, .right-panel {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+        }
+        .left-panel {
+            border-right: 2px solid #ddd;
+        }
+        textarea {
+            width: 100%;
+            height: calc(100% - 60px);
+            padding: 0.5rem;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            border: 1px solid #ddd;
+            resize: none;
+        }
+        button {
+            margin-top: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        button:hover {
+            background: #2980b9;
+        }
+        button:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+        }
+        .review-content {
+            white-space: pre-wrap;
+            line-height: 1.6;
+        }
+        .loading {
+            color: #7f8c8d;
+            font-style: italic;
+        }
+        .error {
+            color: #e74c3c;
+            padding: 1rem;
+            background: #fadbd8;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Code Reviewer</h1>
+    </header>
+    <div class="container">
+        <div class="left-panel">
+            <textarea id="codeInput" placeholder="Paste your code here..."></textarea>
+            <button id="reviewBtn" onclick="reviewCode()">Review Code</button>
+        </div>
+        <div class="right-panel">
+            <div id="reviewOutput" class="review-content">
+                Review results will appear here...
+            </div>
+        </div>
+    </div>
+    <script>
+        async function reviewCode() {
+            const code = document.getElementById('codeInput').value.trim();
+            const output = document.getElementById('reviewOutput');
+            const btn = document.getElementById('reviewBtn');
+            
+            if (!code) {
+                output.innerHTML = '<div class="error">Please paste some code to review.</div>';
+                return;
+            }
+            
+            btn.disabled = true;
+            output.innerHTML = '<div class="loading">⏳ Analyzing code...</div>';
+            
+            try {
+                const response = await fetch('/review', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ code })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let reviewText = '';
+                
+                // Clear loading message
+                output.textContent = '';
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value, { stream: true });
+                    const lines = chunk.split('\n');
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                
+                                if (data.error) {
+                                    output.innerHTML = '<div class="error">❌ ' + data.error + '</div>';
+                                    return;
+                                } else if (data.chunk) {
+                                    reviewText += data.chunk;
+                                    output.textContent = reviewText;
+                                } else if (data.done) {
+                                    // Streaming complete
+                                    break;
+                                }
+                            } catch (e) {
+                                // Skip invalid JSON
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                output.innerHTML = '<div class="error">❌ Error: ' + error.message + '</div>';
+            } finally {
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
