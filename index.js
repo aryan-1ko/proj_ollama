@@ -48,13 +48,25 @@ Do not use markdown formatting. Keep it professional and precise, only return at
     path: '/api/chat',
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
-      'Content-Length': data.length
+      'Content-Type': 'application/json'
     }
   };
 
   return new Promise((resolve, reject) => {
     const req = http.request(options, (res) => {
+
+      // Check for HTTP error status codes
+      if (res.statusCode !== 200) {
+        let errorBody = '';
+        res.on('data', (chunk) => {
+          errorBody += chunk.toString();
+        });
+        res.on('end', () => {
+          reject(new Error(`Ollama API error (${res.statusCode}): ${errorBody}`));
+        });
+        return;
+      }
+
       let buffer = '';
 
       res.on('data', (chunk) => {
@@ -142,7 +154,7 @@ async function handleReview(req, res) {
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive'
       });
-      
+
       // Stream chunks to client
       await streamCodeReview(code, (chunk) => {
         res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
@@ -154,7 +166,7 @@ async function handleReview(req, res) {
     } catch (error) {
       console.error('Error processing review:', error);
       res.write(`data: ${JSON.stringify({ 
-        error: 'Failed to process review. Make sure Ollama is running on http://localhost:11434' 
+        error: error.message || 'Failed to process review (is Ollama running?)'
       })}\n\n`);
       res.end();
     }
